@@ -78,6 +78,25 @@ async with stdio_client(server_params) as (read, write):
         agent_response = await agent.ainvoke({"messages": "what's (3 + 5) x 12?"})
 ```
 
+### Run quick connectivity probes (no API key required)
+
+Run a local stdio MCP server and probe it:
+
+```bash
+python3 /workspace/scripts/probe_mcp.py
+```
+
+Run a local Streamable HTTP MCP server and probe it:
+
+```bash
+# in one shell
+cd /workspace/examples/servers/streamable-http-stateless
+python3 -m mcp_simple_streamablehttp_stateless --port 3010
+
+# in another shell
+python3 /workspace/scripts/probe_mcp_http.py
+```
+
 ## Multiple MCP Servers
 
 The library also allows you to connect to multiple MCP servers and load tools from them:
