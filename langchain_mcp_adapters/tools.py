@@ -4,6 +4,7 @@ This module provides functionality to convert MCP tools into LangChain-compatibl
 tools, handle tool execution, and manage tool conversion between the two formats.
 """
 
+import uuid
 from typing import Any, cast, get_args
 
 from langchain_core.tools import (
@@ -20,6 +21,10 @@ from mcp.types import CallToolResult, EmbeddedResource, ImageContent, TextConten
 from mcp.types import Tool as MCPTool
 from pydantic import BaseModel, create_model
 
+from langchain_mcp_adapters.cache import ToolCache
+from langchain_mcp_adapters.metrics import MetricsCollector
+from langchain_mcp_adapters.resilience import CircuitBreaker, CircuitBreakerOpenError
+from langchain_mcp_adapters.retry import RetryConfig, retry_with_backoff
 from langchain_mcp_adapters.sessions import Connection, create_session
 
 NonTextContent = ImageContent | EmbeddedResource
@@ -102,6 +107,10 @@ def convert_mcp_tool_to_langchain_tool(
     tool: MCPTool,
     *,
     connection: Connection | None = None,
+    cache: ToolCache | None = None,
+    metrics: MetricsCollector | None = None,
+    circuit_breaker: CircuitBreaker | None = None,
+    retry_config: RetryConfig | None = None,
 ) -> BaseTool:
     """Convert an MCP tool to a LangChain tool.
 
@@ -112,6 +121,10 @@ def convert_mcp_tool_to_langchain_tool(
         tool: MCP tool to convert
         connection: Optional connection config to use to create a new session
                     if a `session` is not provided
+        cache: Optional cache for tool results
+        metrics: Optional metrics collector
+        circuit_breaker: Optional circuit breaker for resilience
+        retry_config: Optional retry configuration
 
     Returns:
         a LangChain tool
@@ -124,17 +137,75 @@ def convert_mcp_tool_to_langchain_tool(
     async def call_tool(
         **arguments: dict[str, Any],
     ) -> tuple[str | list[str], list[NonTextContent] | None]:
-        if session is None:
-            # If a session is not provided, we will create one on the fly
-            async with create_session(connection) as tool_session:
-                await tool_session.initialize()
-                call_tool_result = await cast("ClientSession", tool_session).call_tool(
-                    tool.name,
-                    arguments,
-                )
-        else:
-            call_tool_result = await session.call_tool(tool.name, arguments)
-        return _convert_call_tool_result(call_tool_result)
+        call_id = str(uuid.uuid4())
+
+        # Check cache first
+        if cache is not None:
+            cached_result = cache.get(tool.name, arguments)
+            if cached_result is not None:
+                return cached_result
+
+        # Start metrics tracking
+        if metrics is not None:
+            metrics.start_call(tool.name, call_id)
+
+        async def _execute_call() -> tuple[
+            str | list[str], list[NonTextContent] | None
+        ]:
+            if session is None:
+                # If a session is not provided, we will create one on the fly
+                async with create_session(connection) as tool_session:
+                    await tool_session.initialize()
+                    call_tool_result = await cast(
+                        "ClientSession", tool_session
+                    ).call_tool(
+                        tool.name,
+                        arguments,
+                    )
+            else:
+                call_tool_result = await session.call_tool(tool.name, arguments)
+            return _convert_call_tool_result(call_tool_result)
+
+        try:
+            # Apply circuit breaker if configured
+            if circuit_breaker is not None:
+                # Apply retry logic with circuit breaker
+                if retry_config is not None:
+                    result = await retry_with_backoff(
+                        circuit_breaker.call,
+                        _execute_call,
+                        config=retry_config,
+                    )
+                else:
+                    result = await circuit_breaker.call(_execute_call)
+            # Apply retry logic without circuit breaker
+            elif retry_config is not None:
+                result = await retry_with_backoff(_execute_call, config=retry_config)
+            # Direct execution
+            else:
+                result = await _execute_call()
+
+            # Cache successful result
+            if cache is not None:
+                cache.set(tool.name, arguments, result)
+
+            # Record success metrics
+            if metrics is not None:
+                metrics.record_success(tool.name, call_id)
+
+            return result
+
+        except CircuitBreakerOpenError:
+            # Record circuit breaker error
+            if metrics is not None:
+                metrics.record_error(tool.name, call_id, "CircuitBreakerOpen")
+            raise
+        except Exception as e:
+            # Record other errors
+            if metrics is not None:
+                error_type = type(e).__name__
+                metrics.record_error(tool.name, call_id, error_type)
+            raise
 
     return StructuredTool(
         name=tool.name,
@@ -150,12 +221,20 @@ async def load_mcp_tools(
     session: ClientSession | None,
     *,
     connection: Connection | None = None,
+    cache: ToolCache | None = None,
+    metrics: MetricsCollector | None = None,
+    circuit_breaker: CircuitBreaker | None = None,
+    retry_config: RetryConfig | None = None,
 ) -> list[BaseTool]:
     """Load all available MCP tools and convert them to LangChain tools.
 
     Args:
         session: The MCP client session. If None, connection must be provided.
         connection: Connection config to create a new session if session is None.
+        cache: Optional cache for tool results
+        metrics: Optional metrics collector
+        circuit_breaker: Optional circuit breaker for resilience
+        retry_config: Optional retry configuration
 
     Returns:
         List of LangChain tools. Tool annotations are returned as part
@@ -177,7 +256,15 @@ async def load_mcp_tools(
         tools = await _list_all_tools(session)
 
     return [
-        convert_mcp_tool_to_langchain_tool(session, tool, connection=connection)
+        convert_mcp_tool_to_langchain_tool(
+            session,
+            tool,
+            connection=connection,
+            cache=cache,
+            metrics=metrics,
+            circuit_breaker=circuit_breaker,
+            retry_config=retry_config,
+        )
         for tool in tools
     ]
 

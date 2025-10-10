@@ -15,8 +15,12 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import BaseTool
 from mcp import ClientSession
 
+from langchain_mcp_adapters.cache import ToolCache
+from langchain_mcp_adapters.metrics import MetricsCollector
 from langchain_mcp_adapters.prompts import load_mcp_prompt
+from langchain_mcp_adapters.resilience import CircuitBreaker, CircuitBreakerConfig
 from langchain_mcp_adapters.resources import load_mcp_resources
+from langchain_mcp_adapters.retry import RetryConfig
 from langchain_mcp_adapters.sessions import (
     Connection,
     McpHttpClientFactory,
@@ -46,12 +50,30 @@ class MultiServerMCPClient:
     Loads LangChain-compatible tools, prompts and resources from MCP servers.
     """
 
-    def __init__(self, connections: dict[str, Connection] | None = None) -> None:
+    def __init__(
+        self,
+        connections: dict[str, Connection] | None = None,
+        *,
+        enable_cache: bool = True,
+        cache_max_size: int = 1000,
+        cache_ttl_seconds: float = 300.0,
+        enable_metrics: bool = True,
+        enable_circuit_breaker: bool = True,
+        circuit_breaker_config: CircuitBreakerConfig | None = None,
+        retry_config: RetryConfig | None = None,
+    ) -> None:
         """Initialize a MultiServerMCPClient with MCP servers connections.
 
         Args:
             connections: A dictionary mapping server names to connection configurations.
                 If None, no initial connections are established.
+            enable_cache: Whether to enable result caching (default: True)
+            cache_max_size: Maximum cache size (default: 1000)
+            cache_ttl_seconds: Cache TTL in seconds (default: 300)
+            enable_metrics: Whether to enable metrics collection (default: True)
+            enable_circuit_breaker: Whether to enable circuit breaker (default: True)
+            circuit_breaker_config: Custom circuit breaker configuration
+            retry_config: Custom retry configuration
 
         Example: basic usage (starting a new session on each tool call)
 
@@ -92,6 +114,20 @@ class MultiServerMCPClient:
         self.connections: dict[str, Connection] = (
             connections if connections is not None else {}
         )
+
+        # Initialize performance and resilience features
+        self.cache: ToolCache | None = (
+            ToolCache(max_size=cache_max_size, ttl_seconds=cache_ttl_seconds)
+            if enable_cache
+            else None
+        )
+        self.metrics: MetricsCollector | None = (
+            MetricsCollector() if enable_metrics else None
+        )
+        self.circuit_breaker: CircuitBreaker | None = (
+            CircuitBreaker(circuit_breaker_config) if enable_circuit_breaker else None
+        )
+        self.retry_config = retry_config
 
     @asynccontextmanager
     async def session(
@@ -145,13 +181,27 @@ class MultiServerMCPClient:
                     f"expected one of '{list(self.connections.keys())}'"
                 )
                 raise ValueError(msg)
-            return await load_mcp_tools(None, connection=self.connections[server_name])
+            return await load_mcp_tools(
+                None,
+                connection=self.connections[server_name],
+                cache=self.cache,
+                metrics=self.metrics,
+                circuit_breaker=self.circuit_breaker,
+                retry_config=self.retry_config,
+            )
 
         all_tools: list[BaseTool] = []
         load_mcp_tool_tasks = []
         for connection in self.connections.values():
             load_mcp_tool_task = asyncio.create_task(
-                load_mcp_tools(None, connection=connection)
+                load_mcp_tools(
+                    None,
+                    connection=connection,
+                    cache=self.cache,
+                    metrics=self.metrics,
+                    circuit_breaker=self.circuit_breaker,
+                    retry_config=self.retry_config,
+                )
             )
             load_mcp_tool_tasks.append(load_mcp_tool_task)
         tools_list = await asyncio.gather(*load_mcp_tool_tasks)
@@ -216,12 +266,49 @@ class MultiServerMCPClient:
         """
         raise NotImplementedError(ASYNC_CONTEXT_MANAGER_ERROR)
 
+    def get_metrics(self, tool_name: str | None = None) -> dict[str, Any]:
+        """Get performance metrics for tools.
+
+        Args:
+            tool_name: Optional tool name to get metrics for specific tool
+
+        Returns:
+            Dictionary of metrics
+        """
+        if self.metrics is None:
+            return {}
+        return self.metrics.get_metrics(tool_name)
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Get cache statistics.
+
+        Returns:
+            Dictionary of cache statistics
+        """
+        if self.cache is None:
+            return {}
+        return self.cache.get_stats()
+
+    def clear_cache(self) -> None:
+        """Clear the tool result cache."""
+        if self.cache is not None:
+            self.cache.clear()
+
+    async def reset_circuit_breaker(self) -> None:
+        """Reset the circuit breaker to closed state."""
+        if self.circuit_breaker is not None:
+            await self.circuit_breaker.reset()
+
 
 __all__ = [
+    "CircuitBreakerConfig",
     "McpHttpClientFactory",
+    "MetricsCollector",
     "MultiServerMCPClient",
+    "RetryConfig",
     "SSEConnection",
     "StdioConnection",
     "StreamableHttpConnection",
+    "ToolCache",
     "WebsocketConnection",
 ]
