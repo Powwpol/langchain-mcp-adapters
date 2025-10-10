@@ -1,0 +1,11 @@
+{
+  "math": {
+    "transport": "stdio",
+    "command": "python",
+    "args": ["./tests/servers/math_server.py"]
+  },
+  "weather": {
+    "transport": "streamable_http",
+    "url": "http://localhost:8000/mcp"
+  }
+}

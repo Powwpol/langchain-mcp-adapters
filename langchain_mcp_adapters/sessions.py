@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+import shutil
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
@@ -211,8 +212,15 @@ async def _create_stdio_session(  # noqa: PLR0913
     if "PATH" not in env:
         env["PATH"] = os.environ.get("PATH", "")
 
+    # Improve portability: prefer "python3" when only that is available.
+    resolved_command = command
+    if shutil.which(command) is None and command == "python":
+        python3_path = shutil.which("python3")
+        if python3_path is not None:
+            resolved_command = "python3"
+
     server_params = StdioServerParameters(
-        command=command,
+        command=resolved_command,
         args=args,
         env=env,
         cwd=cwd,
@@ -301,9 +309,12 @@ async def _create_streamable_http_session(  # noqa: PLR0913
     if httpx_client_factory is not None:
         kwargs["httpx_client_factory"] = httpx_client_factory
 
+    # Normalize trailing slash to avoid 307 redirects from servers that prefer no slash.
+    normalized_url = url[:-1] if url.endswith("/") else url
+
     async with (
         streamablehttp_client(
-            url,
+            normalized_url,
             headers,
             timeout,
             sse_read_timeout,

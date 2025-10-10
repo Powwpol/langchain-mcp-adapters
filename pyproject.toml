@@ -31,6 +31,9 @@ test = [
     "pytest-timeout>=2.4.0",
 ]
 
+[project.scripts]
+langchain-mcp-agent = "langchain_mcp_adapters.cli:main"
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 # -ra: Report all extra test outcomes (passed, skipped, failed, etc.)
