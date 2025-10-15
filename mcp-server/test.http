@@ -1,0 +1,202 @@
+### Health check - Liveness
+GET http://localhost:8080/livez
+
+### Health check - Readiness
+GET http://localhost:8080/readyz
+
+### List all available tools
+GET http://localhost:8080/mcp/tools
+
+### ===== LLM GENERATE =====
+
+### Simple text generation with OpenAI
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "llm_generate",
+  "arguments": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "messages": [
+      {"role": "user", "content": "What is the capital of France?"}
+    ]
+  }
+}
+
+### Text generation with Anthropic
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "llm_generate",
+  "arguments": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "messages": [
+      {"role": "user", "content": "Explain quantum computing in one paragraph"}
+    ],
+    "opts": {
+      "temperature": 0.3,
+      "max_tokens": 150
+    }
+  }
+}
+
+### Text generation with Gemini
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "llm_generate",
+  "arguments": {
+    "provider": "gemini",
+    "model": "gemini-1.5-flash",
+    "messages": [
+      {"role": "user", "content": "What are the benefits of renewable energy?"}
+    ]
+  }
+}
+
+### Vision example with multimodal content (Anthropic)
+# Replace with actual base64 image data
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "llm_generate",
+  "arguments": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "modality": "vision",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {"type": "text", "data": "What is in this image?"},
+          {"type": "image", "data": "https://example.com/image.jpg"}
+        ]
+      }
+    ]
+  }
+}
+
+### Streaming text generation
+POST http://localhost:8080/mcp/invoke?stream=true
+Content-Type: application/json
+
+{
+  "tool": "llm_generate",
+  "arguments": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "messages": [
+      {"role": "user", "content": "Write a short poem about programming"}
+    ]
+  }
+}
+
+### ===== COMPARE MODELS =====
+
+### Compare OpenAI and Anthropic
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "compare_models",
+  "arguments": {
+    "prompt": "Explain machine learning in simple terms",
+    "a": {
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    "b": {
+      "provider": "anthropic",
+      "model": "claude-3-haiku-20240307"
+    },
+    "opts": {
+      "temperature": 0.5,
+      "max_tokens": 200
+    }
+  }
+}
+
+### Compare Gemini and Grok
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "compare_models",
+  "arguments": {
+    "prompt": "What is the future of AI?",
+    "a": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash"
+    },
+    "b": {
+      "provider": "grok",
+      "model": "grok-beta"
+    }
+  }
+}
+
+### ===== PLAN EXECUTE =====
+
+### Simple task decomposition
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "plan_execute",
+  "arguments": {
+    "goal": "Research renewable energy trends and create a summary",
+    "constraints": ["Keep responses concise", "Focus on 2024 developments"],
+    "tools_allowed": ["llm_generate"],
+    "decomposer": {
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-20241022"
+    },
+    "opts": {
+      "max_depth": 3
+    }
+  }
+}
+
+### Complex planning task
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "plan_execute",
+  "arguments": {
+    "goal": "Analyze the impact of AI on healthcare and education",
+    "constraints": [
+      "Include statistics where possible",
+      "Consider ethical implications",
+      "Maximum 100 tokens per step"
+    ],
+    "tools_allowed": ["llm_generate", "search"],
+    "decomposer": {
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    "opts": {
+      "max_depth": 5
+    }
+  }
+}
+
+### Simple goal with minimal steps
+POST http://localhost:8080/mcp/invoke
+Content-Type: application/json
+
+{
+  "tool": "plan_execute",
+  "arguments": {
+    "goal": "Explain blockchain technology",
+    "decomposer": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash"
+    }
+  }
+}
