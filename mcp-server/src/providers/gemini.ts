@@ -8,7 +8,7 @@ function getModel(model: string) {
 }
 
 export async function callGemini(params: ProviderCallParams): Promise<ProviderResult> {
-  const { model, messages } = params;
+  const { model, messages, opts } = params;
   const start = Date.now();
   const mdl = getModel(model);
 
@@ -21,7 +21,19 @@ export async function callGemini(params: ProviderCallParams): Promise<ProviderRe
     }
   }
 
-  const resp = await (mdl as any).generateContent({ contents: [{ role: 'user', parts }] });
+  const genOpts: any = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: {
+      temperature: opts?.temperature,
+      topP: opts?.top_p,
+      topK: opts?.top_k,
+      maxOutputTokens: opts?.max_tokens,
+      candidateCount: opts?.candidate_count,
+      stopSequences: Array.isArray(opts?.stop) ? opts?.stop : (typeof opts?.stop === 'string' ? [opts?.stop] : undefined),
+      seed: opts?.seed,
+    },
+  };
+  const resp = await (mdl as any).generateContent(genOpts);
   const text = resp?.response?.text?.() ?? '';
   const latencyMs = Date.now() - start;
   return { text, latencyMs, raw: resp };

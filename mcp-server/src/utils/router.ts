@@ -11,6 +11,7 @@ export function getToolsList(): ToolDescriptor[] {
     { name: 'llm_generate', description: 'Generate text/json via selected provider', input_schema: LlmGenerateJsonSchema },
     { name: 'compare_models', description: 'Compare two models on a prompt/messages', input_schema: CompareModelsJsonSchema },
     { name: 'plan_execute', description: 'Plan then execute steps with allowed tools', input_schema: PlanExecuteJsonSchema },
+    { name: 'tf_train', description: 'Train a TensorFlow model and stream metrics', input_schema: { type: 'object', properties: { config: { type: 'object', properties: { layers: { type: 'array', items: { type: 'object', properties: { units: { type: 'number' }, activation: { type: 'string' } }, required: ['units'] } }, epochs: { type: 'number' }, batchSize: { type: 'number' } }, required: ['layers'] }, dataset: { type: 'object' } }, required: ['config','dataset'] } },
   ];
 }
 
@@ -24,6 +25,8 @@ export async function invokeTool(tool: string, args: unknown, options: InvokeOpt
       return compareModels.invoke(args);
     case 'plan_execute':
       return planExecute.invoke(args, options);
+    case 'tf_train':
+      return (await import('../tools/tfTrain.js')).invoke(args, options);
     default:
       throw { code: 'TOOL_NOT_FOUND', message: `Unknown tool: ${tool}` };
   }

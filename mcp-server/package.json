@@ -10,20 +10,21 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "fastify": "^4",
-    "openai": "^4",
     "@anthropic-ai/sdk": "^0.32.0",
     "@google/generative-ai": "^0.21.0",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "dotenv": "^16",
+    "fastify": "^4",
+    "openai": "^4",
+    "pino": "^9",
     "undici": "^6",
     "zod": "^3",
-    "pino": "^9",
-    "dotenv": "^16",
     "zod-to-json-schema": "^3"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "tsx": "^4",
     "@types/node": "^20",
-    "eslint": "^9"
+    "eslint": "^9",
+    "tsx": "^4",
+    "typescript": "^5"
   }
 }

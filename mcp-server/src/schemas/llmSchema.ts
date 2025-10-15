@@ -14,8 +14,16 @@ export const LlmGenerateInput = z.object({
     audio: z.string().optional(),
   }).partial().optional(),
   opts: z.object({
-    temperature: z.number().min(0).max(2).default(0.2).optional(),
+    temperature: z.number().min(0).max(2).optional(),
     max_tokens: z.number().optional(),
+    top_p: z.number().min(0).max(1).optional(),
+    top_k: z.number().int().min(1).optional(),
+    presence_penalty: z.number().min(-2).max(2).optional(),
+    frequency_penalty: z.number().min(-2).max(2).optional(),
+    stop: z.union([z.string(), z.array(z.string())]).optional(),
+    candidate_count: z.number().int().min(1).max(8).optional(),
+    seed: z.number().optional(),
+    response_format: z.any().optional(),
     tools: z.array(z.any()).optional(),
   }).partial().optional(),
 });

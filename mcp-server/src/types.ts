@@ -20,7 +20,19 @@ export type ProviderCallParams = {
   modality: Modality;
   messages: Message[];
   inputs?: { image?: string; audio?: string };
-  opts?: { temperature?: number; max_tokens?: number; tools?: unknown[] };
+  opts?: {
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    top_k?: number;
+    presence_penalty?: number;
+    frequency_penalty?: number;
+    stop?: string | string[];
+    candidate_count?: number;
+    seed?: number;
+    response_format?: unknown;
+    tools?: unknown[];
+  };
   stream?: boolean;
   onChunk?: (delta: string) => void;
 };

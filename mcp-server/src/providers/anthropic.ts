@@ -21,9 +21,11 @@ export async function callAnthropic(params: ProviderCallParams): Promise<Provide
     model,
     max_tokens: opts?.max_tokens ?? 1024,
     temperature: opts?.temperature ?? 0.2,
+    top_p: opts?.top_p,
     system: system && typeof system.content === 'string' ? system.content : undefined,
     messages: contentMessages,
     tools: opts?.tools as any,
+    stop_sequences: Array.isArray(opts?.stop) ? opts?.stop : (typeof opts?.stop === 'string' ? [opts?.stop] : undefined),
   });
 
   const text = resp?.content?.map((p: any) => (p.type === 'text' ? p.text : '')).join('') ?? '';

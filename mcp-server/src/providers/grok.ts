@@ -14,16 +14,25 @@ export async function callGrok(params: ProviderCallParams): Promise<ProviderResu
   const start = Date.now();
   const chatMessages = messages.map((m: any) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }));
 
+  const common: any = {
+    model,
+    messages: chatMessages as any,
+    temperature: opts?.temperature ?? 0.2,
+    max_tokens: opts?.max_tokens,
+    top_p: opts?.top_p,
+    presence_penalty: opts?.presence_penalty,
+    frequency_penalty: opts?.frequency_penalty,
+    stop: opts?.stop,
+  };
+
   if (stream) {
     const resp = await client.chat.completions.create({
-      model,
-      messages: chatMessages as any,
-      temperature: opts?.temperature ?? 0.2,
-      max_tokens: opts?.max_tokens,
+      ...common,
       stream: true,
     });
     let text = '';
-    for await (const chunk of resp) {
+    const asyncStream: any = resp as any;
+    for await (const chunk of asyncStream) {
       const delta = chunk.choices?.[0]?.delta?.content ?? '';
       if (delta) {
         text += delta;
@@ -33,12 +42,7 @@ export async function callGrok(params: ProviderCallParams): Promise<ProviderResu
     const latencyMs = Date.now() - start;
     return { text, latencyMs };
   } else {
-    const resp = await client.chat.completions.create({
-      model,
-      messages: chatMessages as any,
-      temperature: opts?.temperature ?? 0.2,
-      max_tokens: opts?.max_tokens,
-    });
+    const resp = await client.chat.completions.create(common);
     const text = resp.choices?.[0]?.message?.content ?? '';
     const usage = resp.usage ? {
       promptTokens: resp.usage.prompt_tokens ?? undefined,
