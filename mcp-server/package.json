@@ -1,0 +1,34 @@
+{
+  "name": "mcp-multimodal-server",
+  "version": "1.0.0",
+  "description": "MCP server aggregating OpenAI, Anthropic, Gemini, and Grok with multimodal support",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "fastify": "^4.28.1",
+    "@fastify/formbody": "^8.0.1",
+    "openai": "^4.73.0",
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.21.0",
+    "undici": "^6.20.0",
+    "zod": "^3.23.8",
+    "pino": "^9.5.0",
+    "dotenv": "^16.4.5",
+    "zod-to-json-schema": "^3.23.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "tsx": "^4.19.2",
+    "@types/node": "^20.17.6",
+    "eslint": "^9.14.0",
+    "pino-pretty": "^11.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
