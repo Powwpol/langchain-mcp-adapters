@@ -1,0 +1,29 @@
+{
+  "name": "mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "fastify": "^4",
+    "openai": "^4",
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@google/generative-ai": "^0.21.0",
+    "undici": "^6",
+    "zod": "^3",
+    "pino": "^9",
+    "dotenv": "^16",
+    "zod-to-json-schema": "^3"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "tsx": "^4",
+    "@types/node": "^20",
+    "eslint": "^9"
+  }
+}
